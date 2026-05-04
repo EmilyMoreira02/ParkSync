@@ -10,6 +10,7 @@
 - João Guilherme da Silva - Lider - Full-stack
 - Emily Cesar Moreira - Analista - Design/Front-end e Banco de Dados
 - Hudson Henrique Silva Bento - Design e Front-end
+- Amanda Savoy Nunes - Front-end
 
 ### Descrição
 
