@@ -1,7 +1,7 @@
 # Error 404 - Team Not Fund
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/c231df96-0c8e-43dc-bf88-16decb9d8af4" width="65%">
+  <img width="85%" alt="Gemini_Generated_Image_g5z84xg5z84xg5z8" src="https://github.com/user-attachments/assets/00397ea7-c386-4763-ae07-b9fba9aeae95" />
 </div>
 
 ## ParkSync
@@ -25,3 +25,4 @@ No formulário de cadastro de visitante é necessário informar nome completo, C
 No ícone de notificações serão apresentados alertas quando a vaga estiver sendo ocupada por pessoa que não seja o morador ou por alguém que não conste entre os visitantes cadastrados, com os dados do veículo.
 
 Em ajustes o usuário irá ver os seus dados, alterar senha, veículos, preferências de notificação, termos de uso e sair.
+
