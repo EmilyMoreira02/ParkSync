@@ -33,7 +33,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-main);
             color: var(--text-primary);
-            min-height: 100 viewport;
+            min-height: 100vh;
         }
 
         /* Header */
@@ -578,6 +578,73 @@
             color: var(--text-secondary);
             font-size: 0.9rem;
         }
+
+        /* Imagens capturadas (placa / rosto) */
+        .box-content.com-imagem {
+            padding: 0;
+        }
+
+        .box-content img {
+            width: 100%;
+            height: 100%;
+            max-height: 260px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .history-meta {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        .alert-item.alerta-grave {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #f87171;
+        }
+
+        .alert-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .alert-desc {
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .alert-time {
+            color: var(--text-secondary);
+            margin-top: 5px;
+            display: block;
+        }
+
+        .resolver-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .action-btn:disabled,
+        .resolver-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        .server-info {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
     </style>
 </head>
 
@@ -594,12 +661,11 @@
                 </div>
             </div>
             <div class="header-right">
-                <!-- O WebSocket-Status/ws-status-text indica se a conexao com o websocket esta conectado ou nao, entao ele vai ser manipulado se ele estiver offline ele mantem o html e a estilização padrão, caso esteja online ele modifica a cor para --color-success e alterar o texto para conectado -->
+                <!-- Badge do WebSocket: vermelho enquanto desconectado, verde quando conectado -->
                 <div id="websocket-status" class="ws-badge ws-disconnected">
                     <i class="ri-wifi-line"></i>
                     <span id="ws-status-text">Conectando...</span>
                 </div>
-                <!-- O clock/ri-time-line & current-time e a onde vai ficar sistema que pega a data e a hora atual e exibe na interface -->
                 <div class="clock">
                     <i class="ri-time-line"></i>
                     <span id="current-time"></span>
@@ -627,11 +693,8 @@
                                     <i class="ri-car-line"></i>
                                     <span>Leitura de Placa</span>
                                 </div>
-                                <!-- O box-content vai ser substituido na hora da chegada do veiculo ele vai trocar por a imagem em tempo real da camera da leitura da placa vai ser a foto que vai ser capturada pelo esp32 cam mb e no box-content do reconhecimento facial vai ser o video em tempo real da webcam -->
-                                <div class="box-content" id="plate-display">
-                                    <i class="ri-car-line"></i>
-                                    <p class="empty-text">Aguardando veículo...</p>
-                                </div>
+                                <!-- Recebe a foto da ESP32-CAM pelo evento IMAGEM_CAPTURADA (camera="PLACA") -->
+                                <div class="box-content" id="plate-display"></div>
                             </div>
 
                             <div class="verification-box">
@@ -639,15 +702,14 @@
                                     <i class="ri-user-3-line"></i>
                                     <span>Reconhecimento Facial</span>
                                 </div>
-                                <div class="box-content" id="face-display">
-                                    <i class="ri-user-3-line"></i>
-                                    <p class="empty-text">Aguardando pessoa...</p>
-                                </div>
+                                <!-- Recebe o frame da webcam pelo evento IMAGEM_CAPTURADA (camera="ROSTO") -->
+                                <div class="box-content" id="face-display"></div>
                             </div>
                         </div>
 
                         <div id="owner-info-panel"></div>
                         <div id="parking-occupied-panel"></div>
+                        <!-- Resultado do último acesso (preenchido no evento NOVO_ACESSO) -->
                         <div id="status-panel"></div>
                     </div>
                 </div>
@@ -657,7 +719,6 @@
                         <i class="ri-history-line"></i>
                         <h2>Histórico de Acessos</h2>
                     </div>
-                    <!-- A Sessão de historico sera aonde ira mostrar todos os problemas entradas e saidas ocorridos anteriormenentes ordenados pelo horario do ocorrido -->
                     <div class="card-body">
                         <div id="access-history">
                             <div class="empty-state">
@@ -671,16 +732,40 @@
 
             <div class="right-column">
                 <div class="card">
+                    <div class="card-header header-blue">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ri-door-open-line"></i>
+                            <h2>Controle Manual</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="quick-actions-label">Cancelas</p>
+                        <div class="actions-grid">
+                            <button class="action-btn btn-green" data-acao="abrir" data-lado="entrada">
+                                <i class="ri-login-box-line"></i> Abrir entrada</button>
+                            <button class="action-btn btn-orange" data-acao="abrir" data-lado="saida">
+                                <i class="ri-logout-box-line"></i> Abrir saída</button>
+                        </div>
+                        <p class="quick-actions-label" style="margin-top: 12px;">Testar sem a ESP32 (simula o sensor)</p>
+                        <div class="actions-grid">
+                            <button class="action-btn btn-blue" data-acao="simular" data-lado="entrada">
+                                <i class="ri-car-line"></i> Carro na entrada</button>
+                            <button class="action-btn btn-purple" data-acao="simular" data-lado="saida">
+                                <i class="ri-car-line"></i> Carro na saída</button>
+                        </div>
+                        <p id="server-info" class="server-info">Verificando servidor...</p>
+                    </div>
+                </div>
+
+                <div class="card">
                     <div class="card-header header-orange">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <i class="ri-notification-3-line"></i>
                             <h2>Alertas</h2>
                             <span id="alerts-badge" class="badge" style="display: none;">0</span>
                         </div>
-                        <button id="clear-alerts-btn" class="clear-btn" onclick="clearAlerts()"
-                            style="display: none;">Limpar</button>
+                        <button id="clear-alerts-btn" class="clear-btn" style="display: none;">Resolver todos</button>
                     </div>
-                    <!-- Na aba de alertas vamos inserir certos cards(Titulo do alerta, descricao, sujeito envolvido, informacoes como data e hora entre outras) ele ira gerar esses cards caso receba do back end inserindo eles em uma ordem super importante, atencao e problema simples, eles vao ser ordenados ou pelas categorias que eles sao ou pela questao de horario emitidos -->
                     <div class="card-body">
                         <div id="alerts-list">
                             <div class="empty-state">
@@ -698,7 +783,6 @@
                             <h2>Status de Vagas</h2>
                         </div>
                     </div>
-                    <!-- Aqui nas vagas iremos gerar cards(Numero da vaga, dono, status de ocupada/nao ocupada, se estiver sendo ocupada por qual veiculo(placa do veiculo), se nao for o dono do veiculo ele tras informacoes do morador dono do veiculo que esta na vaga incorreta sempre trabalhando com as cores selecionadas no root do styles.css) -->
                     <div class="card-body">
                         <p id="parking-summary" class="parking-summary">Carregando vagas...</p>
                         <div id="parking-spots"></div>
@@ -710,212 +794,437 @@
 
     <script>
         // ==========================================
+        // ⚙️ CONFIGURAÇÃO
+        // Endereço da API: abra com ?api=http://IP_DO_PC:8000 (fica salvo no navegador).
+        // Sem isso usa http://127.0.0.1:8000.
+        // Se o .env tiver PORTARIA_API_KEY, abra também com ?chave=SUA_CHAVE (fica salva).
+        // ==========================================
+        function configSalva(param, chaveStorage) {
+            let valor = new URLSearchParams(location.search).get(param);
+            try {
+                if (valor) localStorage.setItem(chaveStorage, valor);
+                else valor = localStorage.getItem(chaveStorage);
+            } catch (e) { /* navegador sem localStorage */ }
+            return valor || '';
+        }
+
+        const API_BASE = (configSalva('api', 'parksync_api') ||
+            (location.protocol.startsWith('http') && location.port === '8000' ? location.origin : 'http://127.0.0.1:8000')
+        ).replace(/\/+$/, '');
+        const WS_URL = API_BASE.replace(/^http/, 'ws') + '/ws/portaria';
+        const PORTARIA_KEY = configSalva('chave', 'parksync_chave');
+        const TEMPO_LIMPAR_VERIFICACAO = 30000; // some com fotos/resultado 30 s após o último evento
+
+        const $ = (id) => document.getElementById(id);
+
+        // Escapa tudo que vem do banco antes de virar HTML (placa lida por OCR, nomes, textos de alerta)
+        const MAPA_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => MAPA_ESCAPE[c]);
+
+        const ROTULOS = {
+            ENTRADA: 'Entrada', SAIDA: 'Saída', MORADOR: 'Morador', VISITANTE: 'Visitante',
+            TEMPORARIO: 'Temporário', NEGADO: 'Negado', MANUAL: 'Manual',
+        };
+        const rotuloTipo = (tipo) => String(tipo || '').split('_').map(p => ROTULOS[p] || p).join(' · ');
+        const rotuloAlerta = (tipo) => String(tipo || 'ALERTA').replace(/_/g, ' ');
+        const alertaGrave = (tipo) => /INVASAO|SUSPEITA|NAO_CONFERE|OUTRO_MORADOR/.test(tipo || '');
+
+        async function chamarApi(caminho, opcoes = {}, ms = 10000) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), ms);
+            const headers = { ...(opcoes.headers || {}) };
+            if (PORTARIA_KEY) headers['X-Portaria-Key'] = PORTARIA_KEY;
+            try {
+                const res = await fetch(API_BASE + caminho, { ...opcoes, headers, signal: ctrl.signal });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    let msg = typeof data.detail === 'string' ? data.detail : `Erro HTTP ${res.status}`;
+                    if (res.status === 403) msg += ' (abra o painel no PC da API ou use ?chave=)';
+                    throw new Error(msg);
+                }
+                return data;
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        // ==========================================
         // 🕒 CONTROLE DE DATA E HORA
         // ==========================================
+        const elementoRelogio = $('current-time');
+        const formatoRelogio = new Intl.DateTimeFormat('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
         function atualizarRelogio() {
-            const elementoRelogio = document.getElementById('current-time');
-            if (elementoRelogio) {
-                const agora = new Date();
-                const opcoesData = { day: '2-digit', month: '2-digit', year: 'numeric' };
-                const opcoesHora = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
-                const dataFormatada = agora.toLocaleDateString('pt-BR', opcoesData);
-                const horaFormatada = agora.toLocaleTimeString('pt-BR', opcoesHora);
-                elementoRelogio.textContent = `${dataFormatada} - ${horaFormatada}`;
-            }
+            elementoRelogio.textContent = formatoRelogio.format(new Date()).replace(',', ' -');
         }
         setInterval(atualizarRelogio, 1000);
         atualizarRelogio();
 
         // ==========================================
-        // 📡 CONEXÃO WEBSOCKET E STATUS
+        // 📡 WEBSOCKET COM RECONEXÃO (backoff 1 s, 2 s, 4 s ... até 30 s)
         // ==========================================
-        let ws;
-        const wsStatusText = document.getElementById('ws-status-text');
-        const wsStatusBadge = document.getElementById("websocket-status");
+        let ws = null;
+        let tentativasWs = 0;
+        let timerReconexao = null;
+        const wsStatusText = $('ws-status-text');
+        const wsStatusBadge = $('websocket-status');
+
+        function mostrarStatusWs(online, texto) {
+            wsStatusText.textContent = texto;
+            wsStatusBadge.classList.toggle('ws-connected', online);
+            wsStatusBadge.classList.toggle('ws-disconnected', !online);
+        }
 
         function conectarWebSocket() {
-            ws = new WebSocket(`ws://127.0.0.1:8000/ws/portaria`);
+            clearTimeout(timerReconexao);
+            let socket;
+            try {
+                socket = new WebSocket(WS_URL);
+            } catch (e) {
+                agendarReconexao();
+                return;
+            }
+            ws = socket;
 
-            ws.onopen = () => {
-                if (wsStatusText && wsStatusBadge) {
-                    wsStatusText.textContent = "Servidor Online";
-                    wsStatusBadge.classList.remove("ws-disconnected");
-                    wsStatusBadge.classList.add("ws-connected");
-                }
-                carregarDadosIniciais();
+            socket.onopen = () => {
+                tentativasWs = 0;
+                mostrarStatusWs(true, 'Servidor Online');
+                agendarAtualizacao(0);   // pega o que aconteceu enquanto estava offline
+                verificarServidor();
             };
 
-            ws.onclose = () => {
-                if (wsStatusText && wsStatusBadge) {
-                    wsStatusText.textContent = "Servidor Offline - Reconectando...";
-                    wsStatusBadge.classList.remove("ws-connected");
-                    wsStatusBadge.classList.add("ws-disconnected");
-                }
-                setTimeout(conectarWebSocket, 3000);
+            socket.onclose = () => {
+                if (ws !== socket) return;   // conexão antiga, já substituída
+                ws = null;
+                agendarReconexao();
             };
 
-            ws.onmessage = (event) => {
-                const dados = JSON.parse(event.data);
+            socket.onerror = () => socket.close();
+
+            socket.onmessage = (event) => {
+                let dados;
+                try { dados = JSON.parse(event.data); } catch (e) { return; }
                 processarMensagemTempoReal(dados);
             };
         }
-        conectarWebSocket();
+
+        function agendarReconexao() {
+            const espera = Math.min(30000, 1000 * 2 ** tentativasWs);
+            tentativasWs++;
+            mostrarStatusWs(false, `Servidor Offline - reconectando em ${Math.round(espera / 1000)} s`);
+            timerReconexao = setTimeout(conectarWebSocket, espera);
+        }
+
+        // Volta a conectar na hora quando a aba volta a ficar visível ou a rede volta
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !ws) conectarWebSocket();
+        });
+        window.addEventListener('online', () => { if (!ws) conectarWebSocket(); });
 
         // ==========================================
-        // 🔄 CARREGAMENTO INICIAL (REST API)
+        // 🔄 DADOS DO PAINEL (REST)
+        // Vários eventos seguidos viram UMA requisição; e só redesenha a parte que mudou.
         // ==========================================
-        async function carregarDadosIniciais() {
+        let timerAtualizacao = null;
+        let buscando = false;
+        let buscarDeNovo = false;
+        let mostrarUltimoAcesso = false;
+        const ultimoJson = { historico: '', alertas: '', vagas: '' };
+
+        function agendarAtualizacao(atraso = 250) {
+            clearTimeout(timerAtualizacao);
+            timerAtualizacao = setTimeout(carregarDados, atraso);
+        }
+
+        async function carregarDados() {
+            if (buscando) { buscarDeNovo = true; return; }
+            buscando = true;
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/portaria/iniciar-dados');
-                const dados = await response.json();
-                renderizarHistorico(dados.historico);
-                renderizarAlertas(dados.alertas);
-                renderizarVagas(dados.vagas);
+                const dados = await chamarApi('/api/portaria/iniciar-dados');
+                for (const secao of ['historico', 'alertas', 'vagas']) {
+                    const lista = Array.isArray(dados[secao]) ? dados[secao] : [];
+                    const json = JSON.stringify(lista);
+                    if (json === ultimoJson[secao]) continue;   // nada mudou nessa seção
+                    ultimoJson[secao] = json;
+                    if (secao === 'historico') renderizarHistorico(lista);
+                    if (secao === 'alertas') renderizarAlertas(lista);
+                    if (secao === 'vagas') renderizarVagas(lista);
+                }
+                if (mostrarUltimoAcesso && dados.historico && dados.historico.length) {
+                    mostrarUltimoAcesso = false;
+                    renderizarResultado(dados.historico[0]);
+                }
             } catch (error) {
-                console.error("Erro ao buscar dados iniciais:", error);
+                console.error('Erro ao buscar dados do painel:', error);
+            } finally {
+                buscando = false;
+                if (buscarDeNovo) { buscarDeNovo = false; agendarAtualizacao(); }
+            }
+        }
+
+        function textoLeitorPlacas(s) {
+            const l = s.leitor_placas;
+            if (!l) return s.leitor_placas_carregado ? '🟢 Leitor de placas pronto' : '🟡 Leitor de placas carregando';
+            if (l.pronto) return l.modo === 'so_ocr' ? '🟡 Leitor de placas sem YOLO (só OCR)' : '🟢 Leitor de placas pronto';
+            if (l.erro) return '🔴 Leitor de placas com erro: ' + l.erro;
+            return '🟡 Leitor de placas carregando';
+        }
+
+        async function verificarServidor() {
+            const info = $('server-info');
+            try {
+                const s = await chamarApi('/', {}, 5000);
+                const partes = [
+                    s.mqtt_conectado ? '🟢 MQTT conectado' : '🔴 MQTT offline (cancelas não recebem comando)',
+                    s.reconhecimento_facial ? '🟢 Facial ok' : '🔴 Facial indisponível',
+                    textoLeitorPlacas(s),
+                ];
+                info.textContent = partes.join(' · ');
+            } catch (e) {
+                info.textContent = '🔴 API fora do ar';
             }
         }
 
         // ==========================================
-        // 🛠️ RENDERIZAÇÃO DOS CARDS
+        // 🛠️ RENDERIZAÇÃO (monta o HTML uma vez e troca de uma vez só)
         // ==========================================
         function renderizarHistorico(historicoList) {
-            const container = document.getElementById('access-history'); // CORRIGIDO O ID AQUI
-            if (!container) return;
-            container.innerHTML = '';
-
+            const container = $('access-history');
             if (historicoList.length === 0) {
                 container.innerHTML = `<div class="empty-state"><i class="ri-history-line"></i><p>Nenhum acesso registrado</p></div>`;
                 return;
             }
-
-            historicoList.forEach(log => {
-                let borderCor = log.tipo.includes("NEGADO") ? "border-left: 4px solid #ef4444;" : "border-left: 4px solid #10b981;";
-                const card = `
-                <div style="padding: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.15); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); ${borderCor}">
-                    <div style="display:flex; justify-content: space-between;">
-                        <strong>${log.tipo.replace('_', ' ')}</strong>
-                        <small style="color: #94a3b8;">${log.data_hora}</small>
+            container.innerHTML = historicoList.map(log => {
+                const ok = log.sucesso !== false && !String(log.tipo).includes('NEGADO');
+                const quem = log.morador ? `${esc(log.morador)} · ` : '';
+                return `
+                <div class="history-item ${ok ? 'history-approved' : 'history-denied'}">
+                    <div class="history-header">
+                        <span>${esc(rotuloTipo(log.tipo))}</span>
+                        <span class="history-time">${esc(log.data_hora)}</span>
                     </div>
-                    <span style="font-family: monospace; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; margin-top: 5px; display: inline-block;">Placa: <b>${log.placa}</b></span>
+                    <span class="spot-plate">Placa: <b>${esc(log.placa)}</b></span>
+                    ${log.morador || log.motivo ? `<div class="history-meta">${quem}${esc(log.motivo || '')}</div>` : ''}
                 </div>`;
-                container.innerHTML += card;
-            });
+            }).join('');
         }
 
         function renderizarAlertas(alertasList) {
-            const container = document.getElementById('alerts-list');
-            const badge = document.getElementById('alerts-badge');
-            if (!container) return;
+            const container = $('alerts-list');
+            const badge = $('alerts-badge');
+            const btnLimpar = $('clear-alerts-btn');
 
             if (alertasList.length === 0) {
                 container.innerHTML = `<div class="empty-state"><i class="ri-notification-3-line"></i><p>Nenhum alerta ativo</p></div>`;
-                if (badge) badge.style.display = 'none';
+                badge.style.display = 'none';
+                btnLimpar.style.display = 'none';
                 return;
             }
 
-            if (badge) {
-                badge.style.display = 'inline-block';
-                badge.innerText = alertasList.length;
-            }
+            badge.style.display = 'inline-block';
+            badge.textContent = alertasList.length;
+            btnLimpar.style.display = 'inline-block';
 
-            container.innerHTML = '';
-            alertasList.forEach(alerta => {
-                let icon = alerta.tipo.includes("INVASAO") ? "ri-shield-keyhole-line" : "ri-car-line";
-                let colorClass = alerta.tipo.includes("INVASAO") ? "border: 1px solid #ef4444; color: #f87171;" : "border: 1px solid #f59e0b; color: #fcd34d;";
-
-                const card = `
-                <div style="background: rgba(0,0,0,0.2); padding: 12px; margin-bottom: 10px; border-radius: 5px; ${colorClass}">
-                    <div style="font-weight: bold; margin-bottom: 5px;">
-                        <i class="${icon}"></i> ${alerta.tipo.replace('_', ' ')}
+            // Graves primeiro; dentro do grupo, o backend já manda do mais novo para o mais antigo
+            const ordenados = [...alertasList].sort((a, b) => alertaGrave(b.tipo) - alertaGrave(a.tipo));
+            container.innerHTML = ordenados.map(alerta => {
+                const grave = alertaGrave(alerta.tipo);
+                return `
+                <div class="alert-item ${grave ? 'alerta-grave' : ''}">
+                    <div class="alert-title">
+                        <span><i class="${grave ? 'ri-shield-keyhole-line' : 'ri-car-line'}"></i> ${esc(rotuloAlerta(alerta.tipo))}</span>
+                        <button class="resolver-btn" data-alerta="${Number(alerta.id)}">Resolver</button>
                     </div>
-                    <p style="margin: 0; font-size: 13px; color: #f8fafc;">${alerta.descricao}</p>
-                    <small style="color: #94a3b8; margin-top: 5px; display: block;">${alerta.data_hora}</small>
+                    <p class="alert-desc">${esc(alerta.descricao)}</p>
+                    <small class="alert-time">${esc(alerta.data_hora)}</small>
                 </div>`;
-                container.innerHTML += card;
-            });
+            }).join('');
         }
 
         function renderizarVagas(vagasList) {
-            const container = document.getElementById('parking-spots');
-            const summary = document.getElementById('parking-summary');
-            if (!container) return;
+            const container = $('parking-spots');
+            let ocupadas = 0, conflitos = 0;
 
-            container.innerHTML = '';
-            let ocupadas = 0;
-            let conflitos = 0;
-
-            vagasList.forEach(vaga => {
-                let corStatus = "#10b981"; // Verde (Livre)
-                let textoStatus = "LIVRE";
-
+            container.innerHTML = vagasList.map(vaga => {
+                let corStatus = '#10b981', textoStatus = 'LIVRE';
                 if (vaga.conflito) {
-                    corStatus = "#ef4444"; // Vermelho
-                    textoStatus = "CONFLITO!";
-                    conflitos++;
+                    corStatus = '#ef4444'; textoStatus = 'CONFLITO!'; conflitos++;
                 } else if (vaga.ocupada) {
-                    corStatus = "#f59e0b"; // Laranja
-                    textoStatus = "OCUPADA";
-                    ocupadas++;
+                    corStatus = '#f59e0b'; textoStatus = 'OCUPADA'; ocupadas++;
                 }
-
-                const infoVeiculo = vaga.ocupada ? `<span class="spot-plate">${vaga.placa_atual || 'Lendo...'}</span>` : '';
-
-                const card = `
-                <div style="border-left: 4px solid ${corStatus}; padding: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <strong>Vaga ${vaga.numero}</strong>
-                        <span style="color: ${corStatus}; font-size: 11px; font-weight: bold;">${textoStatus}</span>
+                const infoVeiculo = (vaga.ocupada || vaga.conflito)
+                    ? `<span class="spot-plate">${esc(vaga.placa_atual || 'Lendo...')}</span>` : '';
+                return `
+                <div class="spot-item" style="border-left-color: ${corStatus};">
+                    <div class="spot-header">
+                        <span>Vaga ${esc(vaga.numero)}</span>
+                        <span style="color: ${corStatus}; font-size: 11px;">${textoStatus}</span>
                     </div>
-                    <div style="font-size: 12px; color: #94a3b8; margin-top: 5px;">
-                        ${vaga.dono_nome} (Apt: ${vaga.dono_apt})<br>
-                        ${infoVeiculo}
+                    <div class="spot-owner">${esc(vaga.dono_nome)} (Apt: ${esc(vaga.dono_apt)})</div>
+                    ${infoVeiculo}
+                </div>`;
+            }).join('');
+
+            $('parking-summary').innerHTML = vagasList.length === 0
+                ? 'Nenhuma vaga cadastrada.'
+                : `Total: <b>${vagasList.length}</b> | Ocupadas: <b>${ocupadas}</b> | Conflitos: <b style="color:#ef4444">${conflitos}</b>`;
+        }
+
+        // Resultado do último acesso, no painel de verificação
+        function renderizarResultado(log) {
+            const ok = log.sucesso !== false && !String(log.tipo).includes('NEGADO');
+            $('status-panel').innerHTML = `
+                <div class="status-panel ${ok ? 'status-approved' : 'status-denied'}">
+                    <div class="status-title">${ok ? '✅ Acesso liberado' : '⛔ Acesso negado'} · ${esc(rotuloTipo(log.tipo))}</div>
+                    <div class="status-message">
+                        Placa <b>${esc(log.placa)}</b>${log.morador ? ` · ${esc(log.morador)}` : ''}<br>
+                        ${esc(log.motivo || '')}
                     </div>
                 </div>`;
-                container.innerHTML += card;
-            });
-
-            if (summary) summary.innerHTML = `Total: <b>${vagasList.length}</b> | Ocupadas: <b>${ocupadas}</b> | Conflitos: <b style="color:#ef4444">${conflitos}</b>`;
+            agendarLimpezaVerificacao();
         }
 
         // ==========================================
-        // 🚀 PROCESSAR EVENTOS EM TEMPO REAL (WEBSOCKET)
+        // 📷 FOTOS DA VERIFICAÇÃO
+        // ==========================================
+        const VAZIO = {
+            PLACA: '<i class="ri-car-line"></i><p class="empty-text">Aguardando veículo...</p>',
+            ROSTO: '<i class="ri-user-3-line"></i><p class="empty-text">Aguardando pessoa...</p>',
+        };
+        const caixas = { PLACA: $('plate-display'), ROSTO: $('face-display') };
+        let timerLimpeza = null;
+
+        function limparVerificacao() {
+            for (const [camera, box] of Object.entries(caixas)) {
+                box.classList.remove('com-imagem');
+                box.innerHTML = VAZIO[camera];
+            }
+            $('status-panel').innerHTML = '';
+        }
+
+        function agendarLimpezaVerificacao() {
+            clearTimeout(timerLimpeza);
+            timerLimpeza = setTimeout(limparVerificacao, TEMPO_LIMPAR_VERIFICACAO);
+        }
+
+        function mostrarImagem(camera, base64) {
+            const box = caixas[camera];
+            if (!box || typeof base64 !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(base64)) return;
+            let img = box.querySelector('img');
+            if (!img) {
+                box.innerHTML = '';
+                img = document.createElement('img');
+                img.alt = camera === 'PLACA' ? 'Foto da placa' : 'Foto do rosto';
+                box.appendChild(img);
+                box.classList.add('com-imagem');
+            }
+            img.src = 'data:image/jpeg;base64,' + base64;
+            $('status-panel').innerHTML = '';   // nova passagem: some o resultado anterior
+            agendarLimpezaVerificacao();
+        }
+
+        // ==========================================
+        // 🚀 EVENTOS EM TEMPO REAL
         // ==========================================
         function processarMensagemTempoReal(dados) {
-            if (dados.evento === "ATUALIZACAO_VAGAS" || dados.evento === "NOVO_ACESSO") {
-                carregarDadosIniciais();
-            }
-            else if (dados.evento === "NOVO_ALERTA") {
-                carregarDadosIniciais();
-                tocarSomAlerta();
-            }
-            else if (dados.evento === "IMAGEM_CAPTURADA") {
-                // Atualiza a imagem na tela instantaneamente sem precisar recarregar o banco
-                if (dados.camera === "PLACA") {
-                    const box = document.getElementById('plate-display');
-                    if (box) {
-                        box.innerHTML = '';
-                        box.style.backgroundImage = `url('data:image/jpeg;base64,${dados.base64}')`;
-                        box.style.backgroundSize = "cover";
-                        box.style.backgroundPosition = "center";
-                    }
-                }
-                if (dados.camera === "ROSTO") {
-                    const box = document.getElementById('face-display');
-                    if (box) {
-                        box.innerHTML = '';
-                        box.style.backgroundImage = `url('data:image/jpeg;base64,${dados.base64}')`;
-                        box.style.backgroundSize = "cover";
-                        box.style.backgroundPosition = "center";
-                    }
-                }
+            switch (dados.evento) {
+                case 'NOVO_ACESSO':
+                    mostrarUltimoAcesso = true;
+                    agendarAtualizacao();
+                    break;
+                case 'ATUALIZACAO_VAGAS':
+                    agendarAtualizacao();
+                    break;
+                case 'NOVO_ALERTA':
+                    agendarAtualizacao();
+                    tocarSomAlerta();
+                    break;
+                case 'IMAGEM_CAPTURADA':
+                    mostrarImagem(dados.camera, dados.base64);
+                    break;
             }
         }
 
+        // Bipe curto sem arquivo de áudio (o navegador só toca depois do 1º clique na página)
+        let audioCtx = null;
+        document.addEventListener('click', () => {
+            if (!audioCtx && window.AudioContext) audioCtx = new AudioContext();
+        }, { once: true });
+
         function tocarSomAlerta() {
-            console.log("🚨 BEEP BEEP BEEP!");
-            // const audio = new Audio('alerta.mp3'); audio.play();
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const ganho = audioCtx.createGain();
+                osc.frequency.value = 880;
+                ganho.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                ganho.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+                osc.connect(ganho).connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.6);
+            } catch (e) { /* sem áudio */ }
         }
+
+        // ==========================================
+        // 🖱️ AÇÕES DO PORTEIRO
+        // ==========================================
+        $('alerts-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-alerta]');
+            if (!btn) return;
+            btn.disabled = true;
+            try {
+                await chamarApi(`/api/alertas/${btn.dataset.alerta}/resolver`, { method: 'POST' });
+                agendarAtualizacao(0);
+            } catch (err) {
+                alert('Não foi possível resolver o alerta: ' + err.message);
+                btn.disabled = false;
+            }
+        });
+
+        $('clear-alerts-btn').addEventListener('click', async (e) => {
+            const ids = JSON.parse(ultimoJson.alertas || '[]').map(a => a.id);
+            if (!ids.length || !confirm(`Marcar ${ids.length} alerta(s) como resolvido(s)?`)) return;
+            e.target.disabled = true;
+            const resultados = await Promise.allSettled(
+                ids.map(id => chamarApi(`/api/alertas/${id}/resolver`, { method: 'POST' })));
+            const falhas = resultados.filter(r => r.status === 'rejected');
+            if (falhas.length) alert(`${falhas.length} alerta(s) não resolvido(s): ${falhas[0].reason.message}`);
+            e.target.disabled = false;
+            agendarAtualizacao(0);
+        });
+
+        document.querySelectorAll('[data-acao]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const { acao, lado } = btn.dataset;
+                const nomeLado = lado === 'entrada' ? 'entrada' : 'saída';
+                let caminho, opcoes = { method: 'POST' };
+                if (acao === 'abrir') {
+                    const motivo = prompt(`Motivo para abrir a cancela de ${nomeLado}:`, 'Liberação manual pelo porteiro');
+                    if (motivo === null) return;
+                    caminho = `/api/portaria/cancela/${lado}/abrir`;
+                    opcoes.headers = { 'Content-Type': 'application/json' };
+                    opcoes.body = JSON.stringify({ motivo: motivo.trim() || 'Liberação manual pelo porteiro' });
+                } else {
+                    caminho = `/api/portaria/simular/${lado}`;
+                }
+                btn.disabled = true;
+                try {
+                    const r = await chamarApi(caminho, opcoes);
+                    if (r.aviso) alert(r.aviso);
+                    else if (r.status && r.status !== 'ok') alert(r.status);
+                } catch (err) {
+                    alert('Falhou: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        limparVerificacao();
+        agendarAtualizacao(0);
+        conectarWebSocket();
+        setInterval(verificarServidor, 30000);
     </script>
 </body>
 

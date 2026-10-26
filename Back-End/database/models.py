@@ -1,119 +1,154 @@
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
-from typing import List, Optional
-from datetime import datetime
-from database.setup_db import Base
+# Arquivo: Back-End/database/models.py
+#
+# Modelo em 3FN:
+# - Bloco/apartamento ficam só em Unidade (morador aponta para a unidade).
+# - Vaga pertence à Unidade (1 vaga por unidade): "vaga N <-> apto N".
+# - Placa do visitante fica no agendamento (cada visita pode vir com um carro).
+# - Logs e alertas apontam por FK (sem procurar nome dentro de texto).
+
 import enum
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, UniqueConstraint, Enum
+from sqlalchemy.orm import relationship
+from database.setup_db import Base
 
-class StatusEnum(enum.Enum):
-    DENTRO = "DENTRO"
-    SAIU = "SAIU"
 
-class AcessoEnum(enum.Enum):
+class DirecaoEnum(str, enum.Enum):
+    ENTRADA = "ENTRADA"
+    SAIDA = "SAIDA"
+
+
+class TipoAcessoEnum(str, enum.Enum):
     MORADOR = "MORADOR"
     VISITANTE = "VISITANTE"
+    TEMPORARIO = "TEMPORARIO"
     NEGADO = "NEGADO"
     MANUAL = "MANUAL"
 
-class MoradorModel(Base):
+
+class StatusTemporarioEnum(str, enum.Enum):
+    DENTRO = "DENTRO"
+    SAIU = "SAIU"
+
+
+class Unidade(Base):
+    __tablename__ = "unidades"
+    id = Column(Integer, primary_key=True, index=True)
+    bloco = Column(String(50), nullable=False)
+    apartamento = Column(String(50), nullable=False)
+
+    __table_args__ = (UniqueConstraint("bloco", "apartamento", name="uix_bloco_apto"),)
+
+    moradores = relationship("Morador", back_populates="unidade")
+    vaga = relationship("Vaga", back_populates="unidade", uselist=False)
+
+
+class Morador(Base):
     __tablename__ = "moradores"
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    nome: Mapped[str] = mapped_column(String(100), nullable=False)
-    email: Mapped[str] = mapped_column(String(100), index=True, nullable=False, unique=True)
-    senha: Mapped[str] = mapped_column(String(255), nullable=False)
-    apartamento: Mapped[str] = mapped_column(String(10), nullable=False)
-    bloco: Mapped[str] = mapped_column(String(10), nullable=False)
-    face_encoding: Mapped[dict] = mapped_column(JSON, nullable=False)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    veiculos: Mapped[List["VeiculoModel"]] = relationship(back_populates="morador_dono")
-    vaga: Mapped[Optional["VagaModel"]] = relationship(back_populates="morador_dono")
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    senha_hash = Column(String(255), nullable=False)
+    # Vetor de 128 números do face_recognition. É um valor atômico para o sistema
+    # (sempre lido e comparado inteiro), por isso não fere a 1FN.
+    face_encoding = Column(JSON, nullable=True)
+    fk_unidade = Column(Integer, ForeignKey("unidades.id"), nullable=False)
+    criado_em = Column(DateTime, default=datetime.now)
 
-class VeiculoModel(Base):
-    __tablename__ = 'veiculos'
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    marca: Mapped[str] = mapped_column(String(50), nullable=False)
-    modelo: Mapped[str] = mapped_column(String(50), nullable=False)
-    placa: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
-    cor: Mapped[str] = mapped_column(String(30), nullable=False)
-    fk_morador_dono: Mapped[int] = mapped_column(ForeignKey("moradores.id", ondelete="CASCADE"), nullable=False)
-    morador_dono: Mapped["MoradorModel"] = relationship(back_populates="veiculos")
+    unidade = relationship("Unidade", back_populates="moradores")
+    veiculos = relationship("Veiculo", back_populates="dono", cascade="all, delete-orphan")
+    agendamentos = relationship("AgendamentoVisita", back_populates="morador")
 
-class VagaModel(Base):
-    __tablename__ = 'vagas'
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    numero: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
-    ocupado: Mapped[bool] = mapped_column(Boolean, default=False)
-    current_plate: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    status_conflito: Mapped[bool] = mapped_column(Boolean, default=False)
-    coordenadas: Mapped[dict] = mapped_column(JSON, nullable=True)
-    fk_morador_dono: Mapped[int] = mapped_column(ForeignKey("moradores.id", ondelete="RESTRICT"), unique=True, nullable=False)
-    morador_dono: Mapped["MoradorModel"] = relationship(back_populates="vaga")
 
-class VeiculoTemporario(Base):
-    __tablename__ = 'veiculos_temporarios'
-    id_veiculo_temporario: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    placa_veiculo_temporario: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    horario_entrada: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    status: Mapped[StatusEnum] = mapped_column(default=StatusEnum.DENTRO, nullable=False)
-    fk_morador_dono: Mapped[int] = mapped_column(ForeignKey("moradores.id", ondelete="CASCADE"), index=True,nullable=False)
+class Veiculo(Base):
+    __tablename__ = "veiculos"
+    id = Column(Integer, primary_key=True, index=True)
+    placa = Column(String(10), unique=True, index=True, nullable=False)
+    marca = Column(String(50))
+    modelo = Column(String(50))
+    cor = Column(String(50))
+    fk_morador = Column(Integer, ForeignKey("moradores.id"), nullable=False)
 
-class VisitanteModel(Base):
-    __tablename__ = 'visitantes'
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    nome: Mapped[str] = mapped_column(String(100), nullable=False)
-    cpf: Mapped[str] = mapped_column(String(14), unique=True, nullable=False)
-    cnh: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    placa_veiculo: Mapped[str] = mapped_column(String(10), nullable=False)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    agendamentos: Mapped[List["AgendamentoVisita"]] = relationship(back_populates="visitante", cascade="all, delete-orphan")
+    dono = relationship("Morador", back_populates="veiculos")
+
+
+class Vaga(Base):
+    __tablename__ = "vagas"
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String(50), unique=True, nullable=False)
+    fk_unidade = Column(Integer, ForeignKey("unidades.id"), unique=True, nullable=True)
+    # Lista PLANA [x1, y1, x2, y2, x3, y3, x4, y4] na escala da tela do vagas.html (800x600)
+    coordenadas = Column(JSON, nullable=True)
+    ocupada = Column(Boolean, default=False)
+    current_plate = Column(String(10), nullable=True)
+    status_conflito = Column(Boolean, default=False)
+
+    unidade = relationship("Unidade", back_populates="vaga")
+
+
+class Visitante(Base):
+    __tablename__ = "visitantes"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    # CPF opcional. NULL não conflita com o UNIQUE (vários visitantes sem CPF podem existir).
+    cpf = Column(String(11), unique=True, index=True, nullable=True)
+    cnh = Column(String(20), nullable=True)
+
+    agendamentos = relationship("AgendamentoVisita", back_populates="visitante")
+
 
 class AgendamentoVisita(Base):
-    __tablename__ = 'agendamentos_visita'
-    id_agendamento: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    fk_id_morador: Mapped[int] = mapped_column(ForeignKey("moradores.id", ondelete="CASCADE"), index=True,nullable=False)
-    fk_id_visitante: Mapped[int] = mapped_column(ForeignKey("visitantes.id", ondelete="CASCADE"), index=True,nullable=False)
-    data_entrada_prevista: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    data_saida_prevista: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    ativo: Mapped[bool] = mapped_column(Boolean, default=False)
-    visitante: Mapped["VisitanteModel"] = relationship(back_populates="agendamentos")
+    __tablename__ = "agendamentos_visita"
+    id = Column(Integer, primary_key=True, index=True)
+    fk_morador = Column(Integer, ForeignKey("moradores.id"), nullable=False)
+    fk_visitante = Column(Integer, ForeignKey("visitantes.id"), nullable=False)
+    placa_veiculo = Column(String(10), nullable=True, index=True)
+    inicio = Column(DateTime, nullable=False)
+    fim = Column(DateTime, nullable=False)
+    cancelado = Column(Boolean, default=False)
+
+    morador = relationship("Morador", back_populates="agendamentos")
+    visitante = relationship("Visitante", back_populates="agendamentos")
+
+
+class LogAcesso(Base):
+    __tablename__ = "logs_acesso"
+    id = Column(Integer, primary_key=True, index=True)
+    data_hora = Column(DateTime, default=datetime.now, index=True)
+    direcao = Column(Enum(DirecaoEnum), nullable=False)
+    tipo = Column(Enum(TipoAcessoEnum), nullable=False)
+    placa_lida = Column(String(10), nullable=True)
+    fk_morador = Column(Integer, ForeignKey("moradores.id"), nullable=True)
+    fk_agendamento = Column(Integer, ForeignKey("agendamentos_visita.id"), nullable=True)
+    path_foto_rosto = Column(String(255), nullable=True)
+    path_foto_placa = Column(String(255), nullable=True)
+    sucesso = Column(Boolean, default=True)
+    motivo = Column(String(255), nullable=True)
+
+    morador = relationship("Morador")
+    agendamento = relationship("AgendamentoVisita")
+
+
+class VeiculoTemporario(Base):
+    """Carro que NÃO é do morador, mas entrou com ele (rosto reconhecido)."""
+    __tablename__ = "veiculos_temporarios"
+    id = Column(Integer, primary_key=True, index=True)
+    placa = Column(String(10), nullable=False, index=True)
+    fk_morador = Column(Integer, ForeignKey("moradores.id"), nullable=False)
+    fk_log_entrada = Column(Integer, ForeignKey("logs_acesso.id"), nullable=False)
+    fk_log_saida = Column(Integer, ForeignKey("logs_acesso.id"), nullable=True)
+    status = Column(Enum(StatusTemporarioEnum), default=StatusTemporarioEnum.DENTRO, nullable=False)
+
+    morador = relationship("Morador")
+
 
 class AlertaPainel(Base):
-    __tablename__ = 'alertas_painel'
-    id_alerta: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    texto: Mapped[str] = mapped_column(String(255), nullable=False)
-    ativo: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    resolvido: Mapped[bool] = mapped_column(Boolean, default=False)
-    tipo_alerta: Mapped[str] = mapped_column(String(255), nullable=False)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-class LogVisitante(Base):
-    __tablename__ = 'logs_visitantes'
-    id_log_visitante: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    data_hora_entrada: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    path_foto_capturada: Mapped[str] = mapped_column(String(255), nullable=False)
-    visitante_nome: Mapped[str] = mapped_column(String(45), nullable=False)
-    visitante_cpf: Mapped[str] = mapped_column(String(14), nullable=False)
-    visitante_cnh: Mapped[str] = mapped_column(String(20), nullable=False)
-    visitante_placa: Mapped[str] = mapped_column(String(10), nullable=False)
-    morador_anfitriao_nome: Mapped[str] = mapped_column(String(45), nullable=False)
-    apartamento_visitado: Mapped[str] = mapped_column(String(10), nullable=False)
-    bloco_visitado: Mapped[str] = mapped_column(String(10), nullable=False)
-
-class LogAcessoExterno(Base):
-    __tablename__ = 'logs_externos'
-    id_log: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    data_hora: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    placa_detectada: Mapped[str] = mapped_column(String(10), nullable=False)
-    tipo_acesso: Mapped[AcessoEnum] = mapped_column(nullable=False, index=True)
-    path_foto_capturada: Mapped[str] = mapped_column(String(255), nullable=False)
-
-class LogAcessoModel(Base):
-    __tablename__ = 'logs_acesso'
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    tipo: Mapped[AcessoEnum] = mapped_column(nullable=False)
-    placa: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    fk_morador_dono: Mapped[Optional[int]] = mapped_column(ForeignKey("moradores.id", ondelete="SET NULL"),nullable=True)
-    sucesso: Mapped[bool] = mapped_column(Boolean, default=False)
-    motivo: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    criado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    __tablename__ = "alertas_painel"
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(50), nullable=False)
+    texto = Column(String(255), nullable=False)
+    fk_vaga = Column(Integer, ForeignKey("vagas.id"), nullable=True)
+    fk_morador = Column(Integer, ForeignKey("moradores.id"), nullable=True)
+    fk_log = Column(Integer, ForeignKey("logs_acesso.id"), nullable=True)
+    resolvido = Column(Boolean, default=False)
+    criado_em = Column(DateTime, default=datetime.now)
