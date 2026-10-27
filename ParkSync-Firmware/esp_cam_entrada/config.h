@@ -7,12 +7,12 @@
 #pragma once
 
 // ================= REDE WI-FI =================
-#define WIFI_SSID        "WIFI_IOT_CFP601"
-#define WIFI_SENHA       "iot@senai601"
+#define WIFI_SSID        ""
+#define WIFI_SENHA       ""
 
 // ================= BROKER MQTT (Mosquitto, no PC do backend) =================
 // Mesmo IP do PC onde roda o Mosquitto (MQTT_IP do .env do backend aponta para ele).
-#define MQTT_BROKER_IP   "10.110.22.31"
+#define MQTT_BROKER_IP   ""
 #define MQTT_PORTA       1883
 // Deixe "" se o Mosquitto não tem usuário/senha (igual a MQTT_USER/MQTT_PASSWORD do .env)
 #define MQTT_USUARIO     ""
