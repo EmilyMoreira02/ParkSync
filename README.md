@@ -24,6 +24,16 @@
 
 <br>
 
+## 🌐 Landing Page
+
+Conheça mais detalhes sobre a nossa solução, proposta de valor e impacto acessando a página oficial do projeto:
+
+🔗 **[Visite a Landing Page do ParkSync](https://parksync-landing-page.onrender.com/)**
+
+<br>
+
+<br>
+
 ## 🗺️ Arquitetura do Sistema
 
 O ParkSync opera em uma infraestrutura fragmentada e eficiente. O módulo de IoT escuta o ambiente e desperta o backend via **MQTT**. O orquestrador assume o comando, processa o *match* duplo com IA e emite os resultados em tempo real via **WebSockets** para a interface da guarita.
