@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="ParkSync Banner" width="100%" src="https://github.com/user-attachments/assets/d2006058-e37d-4a2c-b388-4e04b62a0ed5" />
+  <img alt="ParkSync Banner" width="100%" src="https://github.com/user-attachments/assets/73cc1646-0ea8-43de-93ee-d4d9f83738cf" />
   <br><br>
   <img src="https://img.shields.io/badge/Python-3.11-3553ff?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/FastAPI-API-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
